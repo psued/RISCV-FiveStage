@@ -68,7 +68,7 @@ object branchType {
   val gteu = 4.asUInt(3.W)
   val ltu  = 5.asUInt(3.W)
   val jump = 6.asUInt(3.W)
-  val DC   = 0.asUInt(3.W)
+  val DC   = 7.asUInt(3.W)
 }
 
 
