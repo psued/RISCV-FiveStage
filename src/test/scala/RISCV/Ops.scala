@@ -32,7 +32,7 @@ object Ops {
   case object GE  extends Comparison { def run(rs1Val: Int, rs2Val: Int): Boolean = rs1Val >= rs2Val }
   case object LT  extends Comparison { def run(rs1Val: Int, rs2Val: Int): Boolean = rs1Val <  rs2Val }
   case object GEU extends Comparison { def run(rs1Val: Int, rs2Val: Int): Boolean = !(rs1Val `u>` rs2Val) }
-  case object LTU extends Comparison { def run(rs1Val: Int, rs2Val: Int): Boolean = rs1Val `u>` rs2Val }
+  case object LTU extends Comparison { def run(rs1Val: Int, rs2Val: Int): Boolean = rs2Val `u>` rs1Val }
 
   case class Branch(rs1: Reg, rs2: Reg, dst: Label, comp: Comparison) extends Op with SType
   object Branch{

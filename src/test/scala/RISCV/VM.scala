@@ -89,7 +89,7 @@ case class VM(
 
 
   private def executeAUIPC(op: AUIPC) = {
-    val (regUpdate, nextRegs) = regs + (op.rd -> (pc.value << 12))
+    val (regUpdate, nextRegs) = regs + (op.rd -> (pc.value + (op.imm.value << 12)))
     val nextVM = this.copy(regs = nextRegs)
     Right(step(nextVM, regUpdate.toList:_*))
   }
