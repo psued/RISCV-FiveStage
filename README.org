@@ -18,13 +18,15 @@ To get full credit on milestone 3 all "basic" tests must run with NOPs inserted.
 
 To get full credit on milestone 3 all "programs" tests must run with NOPs inserted.
 
-**** CPU project final delivery: (70 Points)
-The forth and final milstone represents the culmination of all previous work into a single deisgn while aiming to further increase performance. For the final part of this project students are required to add additional hardware of their own choosing to the CPU to try and make it even faster than what was done in milestone 3. Student have the freedom to choose their own component to work on, though we have several optional suggestions as well. To get full credit on milestone 4 a simple version of at least one of the following hardware upgrades must be implemented, this will need to be explained verbally to a TA during a lab session. Additionally all tests in "basic" and "programs" must run successfully. Finally, your code must be uploaded to the course website where it will be evaluated.
+**** CPU project final delivery: (30 + 40 Points)
+The final delivery represents the culmination of all previous work into a single deisgn while aiming to further increase performance. For the final part of this project students are required to add additional hardware of their own choosing to the CPU to try and make it even faster than what was done in milestone 4. Student have the freedom to choose their own component to work on, though we have several optional suggestions as well. To get full credit on the "final delivery" a simple version of at least one of the following hardware upgrades must be implemented, this will need to be explained in a small README file. Additionally all tests in "basic" and "programs" must run successfully. Finally, your code must be uploaded to the course website where it will be evaluated.
 
 - Branch Prediction
 - Fast Branch Handling
 - Value Prediction
 - Data Cache (Quite Advanced)
+
+30 points are given if all tests run correctly tested by the TAs, while the rest of the 40 points are awarded for the additional hardware. 
 
 ** Project Instructions
 To complete this project it is necessary to do the following tasks. They will guide you through setting up the project files, and explain how to start writing th HDL to complete the CPU.
