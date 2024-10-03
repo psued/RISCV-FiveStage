@@ -60,7 +60,7 @@
    on how *methodical* you are. My advice is to design the algorithm first, then when you're
    satisfied implement it on hardware.
    
-
+* Milestone 4
 ** Control hazards
 
    Consider the following code
@@ -85,7 +85,7 @@
    a warning to the barriers that hold spurious instructions telling them to render them impotent
    by setting the control signals to do nothing.
    
-* Milestone 4
+* Final Delivery
   Once you have a design that RAW and control hazards you're ready to up the ante and add some
   improvements to your design.
   Some suggestions:
