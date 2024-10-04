@@ -10,7 +10,7 @@ The goal of the first milestone is to establish basic CPU functionality and corr
 Milestone 2 is a simple evolution of milestone 1. To get full credit on milestone 2 all of the RISCV32I instructions should be added to the design, and the full battery of tests in "basic" and "programs" should successfully execute when NOPs are turned on.
 
 **** Milestone 3: Pipelining the CPU (Basic Datapath) (30 Points) 
-For the 3rd milestone NOPs between every instruction are disabled, and the support for pipelining is added so as to increase CPU performance. Getting this working requires adding support to handle RAW Hazards, Control Hazards, and delay after load. To get full credit for milestone 3 NOPs must be turned off, and all tests in "basic" and "programs" must run successfully.
+For the 3rd milestone NOPs between every instruction are disabled, and the support for pipelining is added so as to increase CPU performance. Getting this working requires adding support to handle RAW Hazards, Control Hazards, and delay after load. To get full credit for milestone 3 NOPs must be turned off, and all tests in "basic" must run successfully.
 
 To get full credit on milestone 3 all "basic" tests must run with NOPs inserted.
 
