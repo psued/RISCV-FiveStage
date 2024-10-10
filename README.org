@@ -16,7 +16,7 @@ To get full credit on milestone 3 all "basic" tests must run with NOPs inserted.
 
 **** Milestone 4: Pipelining the CPU (Completing the Datapath) (30 Points)
 
-To get full credit on milestone 3 all "programs" tests must run with NOPs inserted.
+To get full credit on milestone 3 all "programs" tests must run without NOPs inserted.
 
 **** CPU project final delivery: (30 + 40 Points)
 The final delivery represents the culmination of all previous work into a single deisgn while aiming to further increase performance. For the final part of this project students are required to add additional hardware of their own choosing to the CPU to try and make it even faster than what was done in milestone 4. Student have the freedom to choose their own component to work on, though we have several optional suggestions as well. To get full credit on the "final delivery" a simple version of at least one of the following hardware upgrades must be implemented, this will need to be explained in a small README file. Additionally all tests in "basic" and "programs" must run successfully. Finally, your code must be uploaded to the course website where it will be evaluated.
