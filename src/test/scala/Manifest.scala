@@ -19,7 +19,7 @@ import LogParser._
 
 object Manifest {
 
-  val singleTest = "addi.s"
+  val singleTest = "add.s"
 
   val nopPadded = true
 

@@ -3,59 +3,39 @@ import chisel3._
 import chisel3.experimental.MultiIOModule
 
 class InstructionFetch extends MultiIOModule {
-
-  // Don't touch
-  val testHarness = IO(
-    new Bundle {
-      val IMEMsetup = Input(new IMEMsetupSignals)
-      val PC        = Output(UInt())
-    }
-  )
-
-
-  /**
-    * TODO: Add input signals for handling events such as jumps
-
-    * TODO: Add output signal for the instruction. 
-    * The instruction is of type Bundle, which means that you must
-    * use the same syntax used in the testHarness for IMEM setup signals
-    * further up.
-    */
-  val io = IO(
-    new Bundle {
-      val PC = Output(UInt())
-    })
+  val testHarness = IO(new Bundle {
+    val IMEMsetup = Input(new IMEMsetupSignals)
+    val PC        = Output(UInt(32.W))
+  })
+  val io = IO(new Bundle {
+    val branchTaken  = Input(Bool())
+    val branchTarget = Input(UInt(32.W))
+    val PC           = Output(UInt(32.W))           // <-- give it a width
+    val instruction  = Output(new Instruction)
+  })
 
   val IMEM = Module(new IMEM)
-  val PC   = RegInit(UInt(32.W), 0.U)
+  val PCreg = RegInit(0.U(32.W))
 
-
-  /**
-    * Setup. You should not change this code
-    */
+  // IMEM hookup
   IMEM.testHarness.setupSignals := testHarness.IMEMsetup
-  testHarness.PC := IMEM.testHarness.requestedAddress
+  IMEM.io.instructionAddress    := PCreg
+  testHarness.PC                := IMEM.testHarness.requestedAddress
 
+  // Next PC: branch redirect or PC+4
+  val pcPlus4 = PCreg + 4.U(32.W)
+  val pcNext  = Mux(io.branchTaken, io.branchTarget, pcPlus4)
+  PCreg := pcNext
 
-  /**
-    * TODO: Your code here.
-    * 
-    * You should expand on or rewrite the code below.
-    */
-  io.PC := PC
-  IMEM.io.instructionAddress := PC
+  // *** KEY: align the PC that travels with the instruction ***
+  val pcForID = RegNext(PCreg, 0.U(32.W))
+  io.PC := pcForID
 
-  // PC := PC + 4.U
-
-  val instruction = Wire(new Instruction)
-  instruction := IMEM.io.instruction.asTypeOf(new Instruction)
-
-
-  /**
-    * Setup. You should not change this code.
-    */
-  when(testHarness.IMEMsetup.setup) {
-    PC := 0.U
-    instruction := Instruction.NOP
+  // Instruction out
+  val instrW = WireInit(IMEM.io.instruction.asTypeOf(new Instruction))
+  when (testHarness.IMEMsetup.setup) {
+    PCreg  := 0.U(32.W)
+    instrW := Instruction.NOP
   }
+  io.instruction := instrW
 }

@@ -236,9 +236,3 @@
 *** Step 8:
     Ensure that the simplest addi test works, and give yourself a pat on the back!
     You've just found the corner pieces of the puzzle, so filling in the rest is "simply" being methodical.
-
-* Milestone 1 
-    All tests on the basic folder must pass. 
-
-* Milestone 2 
-    All tests on the program(and basic) folder must pass. 

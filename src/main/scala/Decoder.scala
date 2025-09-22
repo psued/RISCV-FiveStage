@@ -45,14 +45,38 @@ class Decoder() extends Module {
     * `a -> b` == `(a, b)` == `Tuple2(a, b)`
     */
   val opcodeMap: Array[(BitPat, List[UInt])] = Array(
-
-    // signal      regWrite, memRead, memWrite, branch,  jump, branchType,    Op1Select, Op2Select, ImmSelect,    ALUOp
-    LW     -> List(Y,        Y,       N,        N,       N,    branchType.DC, rs1,       imm,       ITYPE,        ALUOps.ADD),
-
-    SW     -> List(N,        N,       Y,        N,       N,    branchType.DC, rs1,       imm,       STYPE,        ALUOps.ADD),
-
-    ADD    -> List(Y,        N,       N,        N,       N,    branchType.DC, rs1,       rs2,       ImmFormat.DC, ALUOps.ADD),
-    SUB    -> List(Y,        N,       N,        N,       N,    branchType.DC, rs1,       rs2,       ImmFormat.DC, ALUOps.SUB),
+    LW -> List(Y, Y, N, N, N, branchType.DC, rs1, imm, ITYPE, ALUOps.ADD), // addr = rs1 + imm
+    SW -> List(N, N, Y, N, N, branchType.DC, rs1, imm, STYPE, ALUOps.ADD), // addr = rs1 + imm
+    ADD -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.ADD),
+    SUB -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SUB),
+    AND -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.AND),
+    OR -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.OR),
+    XOR -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.XOR),
+    SLT -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SLT),
+    SLTU -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SLTU),
+    SLL -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SLL),
+    SRL -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SRL),
+    SRA -> List(Y, N, N, N, N, branchType.DC, rs1, rs2, ImmFormat.DC, ALUOps.SRA),
+    ADDI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.ADD),
+    ANDI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.AND),
+    ORI    -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.OR),
+    XORI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.XOR),
+    SLTI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.SLT),
+    SLTIU  -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      ITYPE,       ALUOps.SLTU),
+    SLLI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      SHAMT,       ALUOps.SLL),
+    SRLI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      SHAMT,       ALUOps.SRL),
+    SRAI   -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      SHAMT,       ALUOps.SRA),
+    LUI    -> List(Y,        N,       N,        N,      N,   branchType.DC, rs1,     imm,      UTYPE,       ALUOps.COPY_B), // result = imm
+    AUIPC  -> List(Y,        N,       N,        N,      N,   branchType.DC, PC,      imm,      UTYPE,       ALUOps.ADD),    // result = PC+imm
+    BEQ -> List(N, N, N, Y, N, beq, PC, imm, BTYPE, ALUOps.ADD),
+    BNE -> List(N, N, N, Y, N, neq, PC, imm, BTYPE, ALUOps.ADD),
+    BLT -> List(N, N, N, Y, N, lt, PC, imm, BTYPE, ALUOps.ADD),
+    BGE -> List(N, N, N, Y, N, gte, PC, imm, BTYPE, ALUOps.ADD),
+    BLTU -> List(N, N, N, Y, N, ltu, PC, imm, BTYPE, ALUOps.ADD),
+    BGEU -> List(N, N, N, Y, N, gteu, PC, imm, BTYPE, ALUOps.ADD),
+    JAL    -> List(Y,        N,       N,        N,      Y,   jump,          PC,      imm,      JTYPE,       ALUOps.ADD),
+    // JALR: target = (rs1 + imm) & ~1, rd gets PC+4
+    JALR   -> List(Y,        N,       N,        N,      Y,   jump,          rs1,     imm,      ITYPE,       ALUOps.ADD)
 
     /**
       TODO: Fill in the blanks
@@ -67,11 +91,11 @@ class Decoder() extends Module {
     NOP,
     opcodeMap)
 
-  io.controlSignals.regWrite   := decodedControlSignals(0)
-  io.controlSignals.memRead    := decodedControlSignals(1)
-  io.controlSignals.memWrite   := decodedControlSignals(2)
-  io.controlSignals.branch     := decodedControlSignals(3)
-  io.controlSignals.jump       := decodedControlSignals(4)
+  io.controlSignals.regWrite   := decodedControlSignals(0).asBool
+  io.controlSignals.memRead    := decodedControlSignals(1).asBool
+  io.controlSignals.memWrite   := decodedControlSignals(2).asBool
+  io.controlSignals.branch     := decodedControlSignals(3).asBool
+  io.controlSignals.jump       := decodedControlSignals(4).asBool
 
   io.branchType := decodedControlSignals(5)
   io.op1Select  := decodedControlSignals(6)
