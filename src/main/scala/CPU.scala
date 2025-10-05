@@ -31,6 +31,8 @@ class CPU extends MultiIOModule {
   val EXMEMbarrier = Module(new EXMEMbarrier).io
   val MEMWBbarrier = Module(new MEMWBbarrier).io
 
+  val Forwarder = Module(new Forwarder)
+
   val ID  = Module(new InstructionDecode)
   val IF  = Module(new InstructionFetch)
   val EX  = Module(new Execute)
@@ -65,13 +67,14 @@ class CPU extends MultiIOModule {
 
   IFIDbarrier.IF_PC := IF.io.PC
   IFIDbarrier.IF_instruction := IF.io.instruction
+  //IFIDbarrier.stall := false.B
 
   ID.io.instruction := IFIDbarrier.ID_instruction
   ID.io.pcIn := IFIDbarrier.ID_PC
 
   IDEXbarrier.ID_PC := ID.io.pcOut
-  IDEXbarrier.rs1Data_in := ID.io.rs1Data
-  IDEXbarrier.rs2Data_in := ID.io.rs2Data
+/*  IDEXbarrier.rs1Data_in := ID.io.rs1Data
+  IDEXbarrier.rs2Data_in := ID.io.rs2Data*/
   IDEXbarrier.rs1_in := ID.io.rs1
   IDEXbarrier.rs2_in := ID.io.rs2
   IDEXbarrier.rd_in := ID.io.rd
@@ -134,4 +137,24 @@ class CPU extends MultiIOModule {
   ID.io.wbWriteAddr := WB.io.wbRdOut
   ID.io.wbWriteData := WB.io.wbDataOut
 
+  // ------FORWARDER--------
+  Forwarder.io.i_ra1 := IDEXbarrier.rs1_out
+  Forwarder.io.i_ra2 := IDEXbarrier.rs2_out
+  Forwarder.io.i_ra1_data := ID.io.rs1Data
+  Forwarder.io.i_ra2_data := ID.io.rs2Data
+
+  Forwarder.io.i_ALUMEM := EXMEMbarrier.out_rd
+  Forwarder.io.i_ALUMEM_data := EXMEMbarrier.out_aluResult
+  Forwarder.io.i_is_MEM_load := EXMEMbarrier.out_ctrl.memRead
+  Forwarder.io.i_write_register := EXMEMbarrier.out_ctrl.regWrite
+
+  Forwarder.io.i_is_WB_writing := MEMWBbarrier.out_wbWe
+  Forwarder.io.i_WBdestination := MEMWBbarrier.out_wbRd
+  Forwarder.io.i_WBdata := MEMWBbarrier.out_wbData
+
+  IDEXbarrier.rs1Data_in := Forwarder.io.o_rs1
+  IDEXbarrier.rs2Data_in := Forwarder.io.o_rs2
+
+  IDEXbarrier.stall := Forwarder.io.stall
+  IFIDbarrier.stall := Forwarder.io.stall
 }
