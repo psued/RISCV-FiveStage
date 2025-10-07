@@ -64,4 +64,6 @@ class EXMEMbarrier extends MultiIOModule {
   io.out_pcTarget    := r_pcTarget
   io.out_linkPC := r_linkPC
 
+
+
 }

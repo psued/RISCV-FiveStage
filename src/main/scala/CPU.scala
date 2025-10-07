@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.core.Input
 import chisel3.experimental.MultiIOModule
 import chisel3.experimental._
+import chisel3.util.MuxCase
+
 
 
 class CPU extends MultiIOModule {
@@ -19,8 +21,8 @@ class CPU extends MultiIOModule {
   )
 
   /**
-    You need to create the classes for these yourself
-    */
+  You need to create the classes for these yourself
+   */
   // val IFBarrier  = Module(new IFBarrier).io
   // val IDBarrier  = Module(new IDBarrier).io
   // val EXBarrier  = Module(new EXBarrier).io
@@ -41,8 +43,8 @@ class CPU extends MultiIOModule {
 
 
   /**
-    * Setup. You should not change this code
-    */
+   * Setup. You should not change this code
+   */
   IF.testHarness.IMEMsetup     := testHarness.setupSignals.IMEMsignals
   ID.testHarness.registerSetup := testHarness.setupSignals.registerSignals
   MEM.testHarness.DMEMsetup    := testHarness.setupSignals.DMEMsignals
@@ -51,30 +53,30 @@ class CPU extends MultiIOModule {
   testHarness.testReadouts.DMEMread     := MEM.testHarness.DMEMpeek
 
   /**
-    spying stuff
-    */
+  spying stuff
+   */
   testHarness.regUpdates := ID.testHarness.testUpdates
   testHarness.memUpdates := MEM.testHarness.testUpdates
   testHarness.currentPC  := IF.testHarness.PC
 
 
   /**
-    TODO: Your code here
-    */
+  TODO: Your code here
+   */
   //Send over values from IF to ID through IFID barrier
   IF.io.branchTaken := MEM.io.branchTakenOut
   IF.io.branchTarget := MEM.io.pcTargetOut
 
-  IFIDbarrier.IF_PC := IF.io.PC
-  IFIDbarrier.IF_instruction := IF.io.instruction
+  IFIDbarrier.IF_PC := IF.io.pc_out
+  IFIDbarrier.IF_instruction := IF.io.instr_out
   //IFIDbarrier.stall := false.B
 
   ID.io.instruction := IFIDbarrier.ID_instruction
   ID.io.pcIn := IFIDbarrier.ID_PC
 
   IDEXbarrier.ID_PC := ID.io.pcOut
-/*  IDEXbarrier.rs1Data_in := ID.io.rs1Data
-  IDEXbarrier.rs2Data_in := ID.io.rs2Data*/
+  IDEXbarrier.rs1Data_in := ID.io.rs1Data
+  IDEXbarrier.rs2Data_in := ID.io.rs2Data
   IDEXbarrier.rs1_in := ID.io.rs1
   IDEXbarrier.rs2_in := ID.io.rs2
   IDEXbarrier.rd_in := ID.io.rd
@@ -140,21 +142,120 @@ class CPU extends MultiIOModule {
   // ------FORWARDER--------
   Forwarder.io.i_ra1 := IDEXbarrier.rs1_out
   Forwarder.io.i_ra2 := IDEXbarrier.rs2_out
-  Forwarder.io.i_ra1_data := ID.io.rs1Data
-  Forwarder.io.i_ra2_data := ID.io.rs2Data
+  Forwarder.io.i_use_rs1 := IDEXbarrier.usesR1
+  Forwarder.io.i_use_rs2 := IDEXbarrier.usesR2
 
   Forwarder.io.i_ALUMEM := EXMEMbarrier.out_rd
-  Forwarder.io.i_ALUMEM_data := EXMEMbarrier.out_aluResult
   Forwarder.io.i_is_MEM_load := EXMEMbarrier.out_ctrl.memRead
   Forwarder.io.i_write_register := EXMEMbarrier.out_ctrl.regWrite
 
   Forwarder.io.i_is_WB_writing := MEMWBbarrier.out_wbWe
   Forwarder.io.i_WBdestination := MEMWBbarrier.out_wbRd
-  Forwarder.io.i_WBdata := MEMWBbarrier.out_wbData
 
-  IDEXbarrier.rs1Data_in := Forwarder.io.o_rs1
-  IDEXbarrier.rs2Data_in := Forwarder.io.o_rs2
+  EX.io.rs1Data := MuxCase(IDEXbarrier.rs1Data_out, Array(
+    (Forwarder.io.o_sel_rs1 === 0.U) -> IDEXbarrier.rs1Data_out,
+    (Forwarder.io.o_sel_rs1 === 1.U) -> MEMWBbarrier.out_wbData,
+     (Forwarder.io.o_sel_rs1 === 2.U) -> EXMEMbarrier.out_aluResult
+  ))
+  EX.io.rs2Data := MuxCase(IDEXbarrier.rs2Data_out, Array(
+    (Forwarder.io.o_sel_rs2 === 0.U) -> IDEXbarrier.rs2Data_out,
+    (Forwarder.io.o_sel_rs2 === 1.U) -> MEMWBbarrier.out_wbData,
+    (Forwarder.io.o_sel_rs2 === 2.U) -> EXMEMbarrier.out_aluResult
+    ))
 
-  IDEXbarrier.stall := Forwarder.io.stall
-  IFIDbarrier.stall := Forwarder.io.stall
+
+/*  IDEXbarrier.rs1Data_in := Forwarder.io.o_rs1
+  IDEXbarrier.rs2Data_in := Forwarder.io.o_rs2*/
+
+  val id_rs1 = IFIDbarrier.ID_instruction.registerRs1
+  val id_rs2 = IFIDbarrier.ID_instruction.registerRs2
+  val id_use_rs1 = (ID.io.op1Select =/= Op1Select.PC)
+  val id_use_rs2 = (ID.io.op2Select =/= Op2Select.imm)
+
+  val ex_rd = IDEXbarrier.rd_out
+  val ex_memRead = IDEXbarrier.ctrl_out.memRead
+
+  val loadUseHazard =
+    ex_memRead && (ex_rd =/= 0.U) &&
+      ((id_use_rs1 && (id_rs1 === ex_rd)) || (id_use_rs2 && (id_rs2 === ex_rd)))
+
+  IFIDbarrier.stall := loadUseHazard // freeze IF & ID
+  IF.io.stallF := loadUseHazard
+  IDEXbarrier.flush := loadUseHazard // inject one bubble into EX
+
+  when(true.B) {
+    printf(p"[HZ ] ID.rs1=$id_rs1 use1=$id_use_rs1 ID.rs2=$id_rs2 use2=$id_use_rs2 | " +
+      p"EX.rd=$ex_rd EX.memRead=$ex_memRead | stall=$loadUseHazard\n")
+  }
+
+
+  // ---------- IF / IFID ----------
+  {
+    // IF: what address are we fetching and are we frozen?
+    printf(p"[IF ] pc=${Hexadecimal(IF.io.pc_out)} stallF=${IF.io.stallF} " +
+      p"br=${MEM.io.branchTakenOut} tgt=${Hexadecimal(MEM.io.pcTargetOut)}\n")
+
+    // IFID: what did we actually latch into ID this cycle?
+    printf(p"[IFID] hold=${IFIDbarrier.stall} " +
+      p"pc=${Hexadecimal(IFIDbarrier.ID_PC)} " +
+      p"instr=${Hexadecimal(IFIDbarrier.ID_instruction.instruction)}\n")
+  }
+
+  // ---------- IDEX (what EX will see) ----------
+  {
+    printf(p"[IDEX] flush=${IDEXbarrier.flush} " +
+      p"pc=${Hexadecimal(IDEXbarrier.EX_PC)} " +
+      p"rd=${IDEXbarrier.rd_out} " +
+      p"memR=${IDEXbarrier.ctrl_out.memRead} memW=${IDEXbarrier.ctrl_out.memWrite} " +
+      p"regW=${IDEXbarrier.ctrl_out.regWrite} " +
+      p"op1Sel=${IDEXbarrier.op1Select_out} op2Sel=${IDEXbarrier.op2Select_out} " +
+      p"usesR1=${IDEXbarrier.usesR1} usesR2=${IDEXbarrier.usesR2}\n")
+  }
+
+  // ---------- IDEX (what EX will see) ----------
+  {
+    printf(p"[IDEX] flush=${IDEXbarrier.flush} " +
+      p"pc=${Hexadecimal(IDEXbarrier.EX_PC)} " +
+      p"rd=${IDEXbarrier.rd_out} " +
+      p"memR=${IDEXbarrier.ctrl_out.memRead} memW=${IDEXbarrier.ctrl_out.memWrite} " +
+      p"regW=${IDEXbarrier.ctrl_out.regWrite} " +
+      p"op1Sel=${IDEXbarrier.op1Select_out} op2Sel=${IDEXbarrier.op2Select_out} " +
+      p"usesR1=${IDEXbarrier.usesR1} usesR2=${IDEXbarrier.usesR2}\n")
+  }
+
+  // ---------- FORWARDER (mux selects) ----------
+  {
+    printf(p"[FWD] rs1=${IDEXbarrier.rs1_out} rs2=${IDEXbarrier.rs2_out} | " +
+      p"MEM.rd=${EXMEMbarrier.out_rd} MEM.memR=${EXMEMbarrier.out_ctrl.memRead} MEM.regW=${EXMEMbarrier.out_ctrl.regWrite} | " +
+      p"WB.rd=${MEMWBbarrier.out_wbRd} WB.we=${MEMWBbarrier.out_wbWe} | " +
+      p"sel1=${Forwarder.io.o_sel_rs1} sel2=${Forwarder.io.o_sel_rs2}\n")
+  }
+
+  // ---------- EX/MEM ----------
+  {
+    printf(p"[EXM] rd=${EXMEMbarrier.out_rd} " +
+      p"regW=${EXMEMbarrier.out_ctrl.regWrite} memR=${EXMEMbarrier.out_ctrl.memRead} memW=${EXMEMbarrier.out_ctrl.memWrite} " +
+      p"alu=${Hexadecimal(EXMEMbarrier.out_aluResult)} " +
+      p"br=${EXMEMbarrier.out_branchTaken} " +
+      p"pcTgt=${Hexadecimal(EXMEMbarrier.out_pcTarget)}\n")
+  }
+
+  // ---------- MEM (current vs commit) ----------
+  {
+    // current MEM inputs (the instruction *issuing* address to DMEM this cycle)
+    printf(p"[MEM cur ] we=${MEM.io.ctrl.regWrite} memRd=${MEM.io.ctrl.memRead} rd=${MEM.io.rd} " +
+      p"alu=${Hexadecimal(MEM.io.aluResult)}\n")
+
+    // what you are actually sending to WB this cycle (with your sync DMEM and RegNext alignment)
+    printf(p"[MEM prev] WB.we=${MEM.io.wbWe} rd=${MEM.io.wbRd} " +
+      p"data=${Hexadecimal(MEM.io.wbData)}\n")
+  }
+
+  // ---------- MEM/WB & WB (commit) ----------
+  {
+    // if MEMWB is pass-through this equals MEM.wb*
+    printf(p"[WB ] we=${WB.io.wbWeOut} rd=${WB.io.wbRdOut} " +
+      p"data=${Hexadecimal(WB.io.wbDataOut)}\n")
+  }
+
 }

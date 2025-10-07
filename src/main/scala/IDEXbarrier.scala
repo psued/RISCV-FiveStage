@@ -1,6 +1,9 @@
 package FiveStage
 import chisel3._
 import chisel3.experimental.MultiIOModule
+import Op1Select._      // must contain PC, rs1 (your encoding)
+import Op2Select._      // must contain imm, rs2
+import branchType._
 
 class IDEXbarrier extends MultiIOModule {
   val io = IO(new Bundle {
@@ -14,8 +17,8 @@ class IDEXbarrier extends MultiIOModule {
     val imm_in        = Input(UInt(32.W))
     val ctrl_in       = Input(new ControlSignals)
     val branchType_in = Input(UInt(3.W))
-    val op1Select_in  = Input(UInt(1.W))
-    val op2Select_in  = Input(UInt(1.W))
+    val op1Select_in  = Input(UInt(1.W))   // widen if your enum needs it
+    val op2Select_in  = Input(UInt(1.W))   // widen if your enum needs it
     val ALUop_in      = Input(UInt(4.W))
 
     // outputs to EX
@@ -32,11 +35,22 @@ class IDEXbarrier extends MultiIOModule {
     val op2Select_out = Output(UInt(1.W))
     val ALUop_out     = Output(UInt(4.W))
 
+    // NEW: pre-selected operands (before forwarding)
+    val opA_out       = Output(UInt(32.W)) // from PC or rs1
+    val opB_out       = Output(UInt(32.W)) // from imm or rs2
+
+    // NEW: whether EX actually reads rs1/rs2 (use for forwarding/stall gating)
+    val usesR1        = Output(Bool())
+    val usesR2        = Output(Bool())
+
+    val isLoad        = Output(Bool()) // EX is a load (for forwarding/stall gating)
+
+
     val stall         = Input(Bool())
     val flush         = Input(Bool())
   })
 
-  // registers (snapshot)
+  // ----------------- pipeline registers -----------------
   val pcReg         = RegInit(0.U(32.W))
   val rs1DataReg    = RegInit(0.U(32.W))
   val rs2DataReg    = RegInit(0.U(32.W))
@@ -70,6 +84,7 @@ class IDEXbarrier extends MultiIOModule {
     aluopReg      := io.ALUop_in
   }
 
+  // ----------------- pass-throughs -----------------
   io.EX_PC          := pcReg
   io.rs1Data_out    := rs1DataReg
   io.rs2Data_out    := rs2DataReg
@@ -83,5 +98,23 @@ class IDEXbarrier extends MultiIOModule {
   io.op2Select_out  := op2SelReg
   io.ALUop_out      := aluopReg
 
+  // ----------------- your request: select operands here -----------------
+  // With your encoding (commented): op1: 0=rs1, 1=PC ; op2: 0=rs2, 1=imm
+  // If using enums: compare to Op1Select.PC / Op2Select.imm
+  val opA = Mux(op1SelReg === PC,  pcReg,  rs1DataReg)
+  val opB = Mux(op2SelReg === imm, immReg, rs2DataReg)
+
+  // Registering is not necessary: these are derived from registered fields.
+  // They naturally "hold" on stall and zero on flush.
+  io.opA_out := opA
+  io.opB_out := opB
+
+  // ----------------- derived usage booleans (for fwd/stall gating) -----------------
+  // True if EX actually reads rs1/rs2 (i.e., selects those paths).
+  // These also respect stall/flush because they’re derived from *latched* selects.
+  io.usesR1 := (op1SelReg =/= PC)
+  io.usesR2 := (op2SelReg =/= imm)
+
+  io.isLoad  := io.ctrl_in.memRead
 
 }

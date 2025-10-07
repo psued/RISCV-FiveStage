@@ -78,6 +78,9 @@ class MemoryFetch() extends MultiIOModule {
   io.wbRd := rd_d
   io.wbWe := regWrite_d
 
+  printf(p"MEM cur: we=${io.ctrl.regWrite} memRd=${io.ctrl.memRead} rd=${io.rd} alu=${Hexadecimal(io.aluResult)}\n")
+  printf(p"MEM prevWB: we=${io.wbWe} rd=${io.wbRd} data=${Hexadecimal(io.wbData)}\n")
+
 
 }
 

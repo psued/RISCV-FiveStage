@@ -77,9 +77,18 @@ class InstructionDecode extends MultiIOModule {
 
   io.pcOut := io.pcIn
 
+  val wbBypass1 = io.wbWriteEnable && (io.wbWriteAddr =/= 0.U) && (io.wbWriteAddr === io.rs1)
+  val wbBypass2 = io.wbWriteEnable && (io.wbWriteAddr =/= 0.U) && (io.wbWriteAddr === io.rs2)
+
+  // Replace these two lines:
+  // io.rs1Data := registers.io.readData1
+  // io.rs2Data := registers.io.readData2
+  io.rs1Data := Mux(wbBypass1, io.wbWriteData, registers.io.readData1)
+  io.rs2Data := Mux(wbBypass2, io.wbWriteData, registers.io.readData2)
+
   // Expose register data and indices
-  io.rs1Data := registers.io.readData1
-  io.rs2Data := registers.io.readData2
+/*  io.rs1Data := registers.io.readData1
+  io.rs2Data := registers.io.readData2*/
   io.rs1 := io.instruction.registerRs1
   io.rs2 := io.instruction.registerRs2
   io.rd := io.instruction.registerRd
