@@ -5,6 +5,7 @@ import chisel3.core.Input
 import chisel3.experimental.MultiIOModule
 import chisel3.experimental._
 import chisel3.util.MuxCase
+import chisel3.util.MuxLookup
 
 
 
@@ -145,6 +146,7 @@ class CPU extends MultiIOModule {
   Forwarder.io.i_use_rs1 := IDEXbarrier.usesR1
   Forwarder.io.i_use_rs2 := IDEXbarrier.usesR2
 
+  Forwarder.io.i_ex_isStore := IDEXbarrier.ctrl_out.memWrite
   Forwarder.io.i_ALUMEM := EXMEMbarrier.out_rd
   Forwarder.io.i_is_MEM_load := EXMEMbarrier.out_ctrl.memRead
   Forwarder.io.i_write_register := EXMEMbarrier.out_ctrl.regWrite
@@ -162,6 +164,11 @@ class CPU extends MultiIOModule {
     (Forwarder.io.o_sel_rs2 === 1.U) -> MEMWBbarrier.out_wbData,
     (Forwarder.io.o_sel_rs2 === 2.U) -> EXMEMbarrier.out_aluResult
     ))
+  val storeData = MuxLookup(Forwarder.io.o_sel_store, IDEXbarrier.rs2Data_out, Seq(
+    FwdSel.WB -> MEMWBbarrier.out_wbData,
+    FwdSel.MEM -> EXMEMbarrier.out_aluResult
+  ))
+  EXMEMbarrier.in_rs2Data := storeData
 
 
 /*  IDEXbarrier.rs1Data_in := Forwarder.io.o_rs1
@@ -172,18 +179,27 @@ class CPU extends MultiIOModule {
   val id_use_rs1 = (ID.io.op1Select =/= Op1Select.PC)
   val id_use_rs2 = (ID.io.op2Select =/= Op2Select.imm)
 
+  val id_isStore = ID.io.ctrl.memWrite
+
   val ex_rd = IDEXbarrier.rd_out
   val ex_memRead = IDEXbarrier.ctrl_out.memRead
+  val ex_isLoad = IDEXbarrier.ctrl_out.memRead
 
   val loadUseHazard =
     ex_memRead && (ex_rd =/= 0.U) &&
       ((id_use_rs1 && (id_rs1 === ex_rd)) || (id_use_rs2 && (id_rs2 === ex_rd)))
 
-  IFIDbarrier.stall := loadUseHazard // freeze IF & ID
-  IF.io.stallF := loadUseHazard
-  IDEXbarrier.flush := loadUseHazard // inject one bubble into EX
+  val loadStoreHazard =
+    ex_isLoad && id_isStore && (ex_rd =/= 0.U) && (id_rs2 === ex_rd)
 
-  when(true.B) {
+
+  val hazard = loadUseHazard || loadStoreHazard
+
+  IFIDbarrier.stall := hazard // freeze IF & ID
+  IF.io.stallF := hazard // freeze IF
+  IDEXbarrier.flush := hazard // inject one bubble into EX
+
+ /* when(true.B) {
     printf(p"[HZ ] ID.rs1=$id_rs1 use1=$id_use_rs1 ID.rs2=$id_rs2 use2=$id_use_rs2 | " +
       p"EX.rd=$ex_rd EX.memRead=$ex_memRead | stall=$loadUseHazard\n")
   }
@@ -256,6 +272,6 @@ class CPU extends MultiIOModule {
     // if MEMWB is pass-through this equals MEM.wb*
     printf(p"[WB ] we=${WB.io.wbWeOut} rd=${WB.io.wbRdOut} " +
       p"data=${Hexadecimal(WB.io.wbDataOut)}\n")
-  }
+  }*/
 
 }

@@ -13,19 +13,23 @@ class IFIDbarrier extends MultiIOModule {
     val ID_instruction = Output(new Instruction)
   })
 
-  // Register the IF outputs so ID sees them one cycle later
+
+  val instrStallReg = RegInit(Instruction.NOP)
+
+  val stallReg = RegInit(false.B)
+
+  stallReg := io.stall
+
   val pcReg = RegInit(0.U(32.W))
-
-  val instrReg = RegInit(0.U.asTypeOf(new Instruction))
-
-  // Only update when NOT stalling
+  io.ID_PC := pcReg
   when(!io.stall) {
     pcReg := io.IF_PC
-    instrReg := io.IF_instruction
   }
-  // When stall = true, pcReg/instrReg keep their previous values automatically
 
-  // Drive outputs from regs (always)
-  io.ID_PC := pcReg
-  io.ID_instruction := instrReg
+  when(stallReg) {
+    io.ID_instruction := instrStallReg
+  }.otherwise {
+    instrStallReg := io.IF_instruction
+    io.ID_instruction := io.IF_instruction
+  }
 }

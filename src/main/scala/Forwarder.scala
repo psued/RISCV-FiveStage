@@ -21,6 +21,8 @@ class Forwarder extends MultiIOModule{
     val i_use_rs1 = Input(Bool())
     val i_use_rs2 = Input(Bool())
 
+    val i_ex_isStore = Input(Bool()) // Is the EX instruction a store (for store data forwarding)
+
 
     val i_ALUMEM = Input(UInt(5.W)) // EX/MEM barrier destination register
     val i_is_MEM_load = Input(Bool()) // EX/MEM barrier is load instruction
@@ -32,6 +34,7 @@ class Forwarder extends MultiIOModule{
 
     val o_sel_rs1 = Output(UInt(2.W))
     val o_sel_rs2 = Output(UInt(2.W))
+    val o_sel_store = Output(UInt(2.W)) // select for store data forwarding
     val stall = Output(Bool()) // stall signal
   })
 
@@ -48,6 +51,8 @@ class Forwarder extends MultiIOModule{
 
   io.o_sel_rs1 := Reg
   io.o_sel_rs2 := Reg
+  io.o_sel_store := Reg
+
 
   // rs1: MEM > WB > Reg
   when(memHit1 && !io.i_is_MEM_load) {
@@ -62,6 +67,19 @@ class Forwarder extends MultiIOModule{
   }.elsewhen(wbHit2) {
     io.o_sel_rs2 := WB
   }
+
+  val memHitStore = io.i_ex_isStore && io.i_write_register &&
+    (io.i_ra2 === io.i_ALUMEM) && (io.i_ALUMEM =/= 0.U)
+  val wbHitStore = io.i_ex_isStore && io.i_is_WB_writing &&
+    (io.i_ra2 === io.i_WBdestination) && (io.i_WBdestination =/= 0.U)
+
+  when(memHitStore && !io.i_is_MEM_load) {
+    io.o_sel_store := MEM
+  }
+    .elsewhen(wbHitStore) {
+      io.o_sel_store := WB
+    }
+
 
   when((memHit1 || memHit2) && io.i_is_MEM_load){
     io.stall := true.B
