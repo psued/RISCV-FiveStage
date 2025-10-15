@@ -6,6 +6,9 @@ import chisel3.experimental.MultiIOModule
 import chisel3.experimental._
 import chisel3.util.MuxCase
 import chisel3.util.MuxLookup
+import Op1Select._
+import Op2Select._
+import branchType._
 
 
 
@@ -105,7 +108,7 @@ class CPU extends MultiIOModule {
 
 
   EXMEMbarrier.stall := false.B
-  EXMEMbarrier.flush := false.B
+  //EXMEMbarrier.flush := false.B
   EXMEMbarrier.in_aluResult := EX.io.aluResult
   EXMEMbarrier.in_rs2Data := EX.io.rs2Pass // store data (unused for ADDI)
   EXMEMbarrier.in_rd := EX.io.rdOut
@@ -176,10 +179,16 @@ class CPU extends MultiIOModule {
 
   val id_rs1 = IFIDbarrier.ID_instruction.registerRs1
   val id_rs2 = IFIDbarrier.ID_instruction.registerRs2
-  val id_use_rs1 = (ID.io.op1Select =/= Op1Select.PC)
-  val id_use_rs2 = (ID.io.op2Select =/= Op2Select.imm)
 
-  val id_isStore = ID.io.ctrl.memWrite
+  // Kinds from ID decoder
+  val id_isBranch = ID.io.ctrl.branch && (ID.io.branchType =/= branchType.DC)
+  val id_isJump   = ID.io.ctrl.jump
+  val id_isJalr   = id_isJump && (ID.io.op1Select === Op1Select.rs1)  // JALR reads rs1
+  val id_isStore  = ID.io.ctrl.memWrite
+
+  // “Does the *ID* instruction read rs1/rs2?”
+  val id_use_rs1 = (ID.io.op1Select =/= Op1Select.PC) || id_isBranch || id_isJalr
+  val id_use_rs2 = (ID.io.op2Select =/= Op2Select.imm) || id_isBranch || id_isStore
 
   val ex_rd = IDEXbarrier.rd_out
   val ex_memRead = IDEXbarrier.ctrl_out.memRead
@@ -194,10 +203,18 @@ class CPU extends MultiIOModule {
 
 
   val hazard = loadUseHazard || loadStoreHazard
+  val branchTaken = MEM.io.branchTakenOut
+
 
   IFIDbarrier.stall := hazard // freeze IF & ID
   IF.io.stallF := hazard // freeze IF
-  IDEXbarrier.flush := hazard // inject one bubble into EX
+  IDEXbarrier.flush := hazard || branchTaken //|| branchTaken // inject one bubble into EX
+
+
+  //IFIDbarrier.flush := false.B //branchTaken
+  IFIDbarrier.flush := branchTaken
+  EXMEMbarrier.flush := branchTaken
+  //IDEXbarrier.flush := branchTaken
 
  /* when(true.B) {
     printf(p"[HZ ] ID.rs1=$id_rs1 use1=$id_use_rs1 ID.rs2=$id_rs2 use2=$id_use_rs2 | " +

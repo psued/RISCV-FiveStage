@@ -4,6 +4,7 @@ import chisel3.experimental.MultiIOModule
 import Op1Select._      // must contain PC, rs1 (your encoding)
 import Op2Select._      // must contain imm, rs2
 import branchType._
+import ALUOps._
 
 class IDEXbarrier extends MultiIOModule {
   val io = IO(new Bundle {
@@ -112,8 +113,29 @@ class IDEXbarrier extends MultiIOModule {
   // ----------------- derived usage booleans (for fwd/stall gating) -----------------
   // True if EX actually reads rs1/rs2 (i.e., selects those paths).
   // These also respect stall/flush because they’re derived from *latched* selects.
-  io.usesR1 := (op1SelReg =/= PC)
-  io.usesR2 := (op2SelReg =/= imm)
+  val isBranch = ctrlReg.branch && (branchTypeReg =/= branchType.DC)
+  val isJump = ctrlReg.jump
+  // Your opcodeMap uses: JAL  -> (jump=true,  op1Select=PC)
+  //                      JALR -> (jump=true,  op1Select=rs1)
+  val isJalr = isJump && (op1SelReg === rs1)
+  val isStore = ctrlReg.memWrite
+
+  // Raw “selected operand” usage (ALU side)
+  val usesR1_raw = (op1SelReg =/= PC) // ALU opA from rs1 (vs PC)
+  val usesR2_raw = (op2SelReg =/= imm) // ALU opB from rs2 (vs imm)
+
+  // Some ALU ops (e.g., COPY_B for LUI) do not actually consume opA/rs1
+  val aluConsumesR1 = (aluopReg =/= COPY_B) // COPY_B ignores opA
+  // If you have ops that ignore opB, you can add a similar mask for R2.
+
+  // Final usage seen by forwarding/hazard unit:
+  // - Branches: comparator needs rs1 *and* rs2
+  // - JALR:     needs rs1
+  // - Stores:   need rs2 (store-data)
+  // - Otherwise: ALU reads whichever side is selected and actually consumed
+  io.usesR1 := isBranch || isJalr || (aluConsumesR1 && usesR1_raw)
+  io.usesR2 := isBranch || isStore || usesR2_raw
+
 
   io.isLoad  := io.ctrl_in.memRead
 
